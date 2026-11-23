@@ -1,0 +1,4 @@
+project_id = "agriguard-ai"
+
+[functions.agronomist-chat]
+verify_jwt = true

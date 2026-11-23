@@ -10,7 +10,7 @@ import {
  * Supabase client + the "Ask AI Agronomist" gateway.
  *
  * Public values only: the URL and the publishable anon key come from
- * VITE_* environment variables (safe to ship to the browser). The OpenAI key
+ * VITE_* environment variables (safe to ship to the browser). The Gemini key
  * is a server-side secret and never enters this file or any client bundle.
  */
 
@@ -41,10 +41,10 @@ export interface ChatDiagnosisContext {
 export type ChatErrorKind =
   | "offline" // no network
   | "auth" // invalid/missing session (JWT)
-  | "rate" // 429 — both our bucket and OpenAI's
+  | "rate" // 429 — both our bucket and Gemini's
   | "server" // upstream/timeout/generic
   | "anon-disabled" // project-level anonymous sign-in is off
-  | "not-configured"; // function lacks its secret
+  | "not-configured"; // Supabase function or Gemini key is not configured
 
 export type AskResult =
   | { ok: true; reply: string }
@@ -90,7 +90,7 @@ function mapInvokeError(error: FunctionsError | Error): ChatErrorKind {
       0;
     if (status === 401 || status === 403) return "auth";
     if (status === 429) return "rate";
-    if (status === 503) return "not-configured";
+    if (status === 404 || status === 503) return "not-configured";
     return "server";
   }
   if (error instanceof FunctionsFetchError) {

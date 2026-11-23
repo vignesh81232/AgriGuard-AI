@@ -3,10 +3,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 /**
  * AgriGuard AI — "Ask AI Agronomist" Edge Function.
  *
- * The ONLY network-backed feature of the app. The OpenAI key lives here as a
- * Supabase secret (OPENAI_API_KEY) and is read via Deno.env.get() — it never
- * reaches the browser. The client is prohibited from calling api.openai.com
- * directly; it only ever POSTs here with a valid Supabase JWT.
+ * The ONLY network-backed feature of the app. The Gemini key lives here as a
+ * Supabase secret (GEMINI_API_KEY) and is read via Deno.env.get() — it never
+ * reaches the browser. The client only POSTs here with a valid Supabase JWT.
  *
  * Auth: a valid Supabase JWT (Bearer header) is required and verified
  * server-side via supabase.auth.getUser(). Anonymous sign-in on the Supabase
@@ -15,11 +14,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
  * Rate limiting: simple in-process token bucket (10 requests / 60 s per user).
  */
 
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const RATE_LIMIT_MAX = 10; // requests
 const RATE_LIMIT_WINDOW_SEC = 60; // seconds
-const MAX_HISTORY = 20; // messages sent to OpenAI
+const MAX_HISTORY = 20; // messages sent to Gemini
 const MAX_CONTENT_CHARS = 4000; // per message
 const MAX_CONTEXT_CHARS = 1200; // diagnosis context blob
 
@@ -29,9 +28,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type Role = "system" | "user" | "assistant";
 interface ChatMessage {
-  role: Role;
+  role: "user" | "assistant";
   content: string;
 }
 interface DiagnosisContext {
@@ -89,12 +87,13 @@ function buildSystemPrompt(context: unknown): string {
   const base =
     'You are "AgriGuard AI", a friendly, practical agronomist embedded in a farmer\'s leaf-diagnosis app. ' +
     "Follow these rules:\n" +
-    "1. Answer in the same language the farmer used (English, हिंदी or Español).\n" +
+    "1. Answer naturally in the same language the farmer used (English, हिंदी or Español).\n" +
     "2. Keep answers concise and actionable — short paragraphs or bullet lists, under ~180 words unless asked for more detail.\n" +
-    '3. When a diagnosis context is provided, treat it as the app\'s analysis of their leaf and answer with it in mind: acknowledge it briefly, then answer the question.\n' +
-    "4. For chemical treatments, give practical guidance only, never invent brand claims — always tell the farmer to read the product label and consult a local agronomist for exact doses.\n" +
-    "5. If the question is outside your knowledge, say so honestly instead of guessing.\n" +
-    "6. Do not claim to be able to see photos other than the attached diagnosis context.";
+    "3. When diagnosis context is attached, explicitly use its crop and disease to tailor the answer. Connect recommendations to this crop-disease combination and reported severity; do not give only generic crop advice.\n" +
+    "4. Treat the diagnosis as an estimate, not a confirmed lab result. Be transparent about its confidence and do not claim to have visually inspected the photo.\n" +
+    "5. If the crop or diagnosis is missing, do not guess; ask a brief clarifying question when needed.\n" +
+    "6. For chemical treatments, give practical guidance only, never invent brand claims — always tell the farmer to read the product label and consult a local agronomist for exact doses.\n" +
+    "7. If the question is outside your knowledge, say so honestly instead of guessing.";
   let contextBlob = "";
   if (context && typeof context === "object") {
     try {
@@ -104,7 +103,7 @@ function buildSystemPrompt(context: unknown): string {
     }
   }
   if (contextBlob) {
-    return `${base}\n\nCurrent diagnosis context (JSON; crop, disease, severity, confidence):\n${contextBlob}`;
+    return `${base}\n\nUse this current diagnosis as the context for the conversation (JSON; crop, disease, severity, confidence):\n${contextBlob}`;
   }
   return `${base}\n\n(No diagnosis attached — the farmer may still ask general agronomy questions.)`;
 }
@@ -161,28 +160,27 @@ Deno.serve(async (req: Request) => {
   }
 
   const system = buildSystemPrompt(diagnosisContext);
-  const openAiMessages: ChatMessage[] = [{ role: "system", content: system }, ...history];
-
-  // ---- 4. Call OpenAI (server-side only) ----
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  // ---- 4. Call Gemini (server-side only) ----
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
-    return json({ error: "not_configured", message: "server chat is not configured" }, 503);
+    return json({ error: "not_configured", message: "Gemini is not configured" }, 503);
   }
 
   let upstream: Response;
   try {
-    upstream = await fetch(OPENAI_URL, {
+    upstream = await fetch(`${GEMINI_URL}/${encodeURIComponent(MODEL)}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        model: MODEL,
-        messages: openAiMessages,
-        temperature: 0.3,
-        max_tokens: 700,
-        stream: false,
+        systemInstruction: { parts: [{ text: system }] },
+        contents: history.map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        })),
+        generationConfig: { temperature: 0.3, maxOutputTokens: 700 },
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -194,7 +192,10 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!upstream.ok) {
-    // Never forward the key or upstream body — keep the client payload minimal.
+    // Keep provider errors and credentials out of the client response.
+    if (upstream.status === 401 || upstream.status === 403) {
+      return json({ error: "not_configured", message: "Gemini API key is invalid" }, 503);
+    }
     if (upstream.status === 429) {
       return json({ error: "upstream_rate_limit" }, 502);
     }
@@ -203,9 +204,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const data = (await upstream.json()) as {
-      choices?: { message?: { content?: string } }[];
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
     };
-    const reply = (data.choices?.[0]?.message?.content ?? "").trim();
+    const reply = (data.candidates?.[0]?.content?.parts ?? [])
+      .map((part) => part.text ?? "")
+      .join("")
+      .trim();
     if (!reply) return json({ error: "upstream_error", message: "empty reply" }, 502);
     return json({ reply });
   } catch {

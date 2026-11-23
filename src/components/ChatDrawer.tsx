@@ -44,7 +44,7 @@ const ERROR_KEY: Record<ChatErrorKind, TranslationKey> = {
   rate: "chatErrorRate",
   server: "chatErrorServer",
   "anon-disabled": "chatErrorAuth",
-  "not-configured": "chatErrorServer",
+  "not-configured": "chatErrorConfig",
 };
 
 const FOCUSABLE =
@@ -179,7 +179,7 @@ export default function ChatDrawer({ open, onClose, diagnosis }: Props) {
       <div
         onClick={onClose}
         role="presentation"
-        className={`absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+        className={`pointer-events-auto absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300 ease-out motion-reduce:transition-none ${
           open ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -190,7 +190,7 @@ export default function ChatDrawer({ open, onClose, diagnosis }: Props) {
         aria-modal="true"
         aria-labelledby="agrichat-title"
         tabIndex={-1}
-        className={`absolute inset-x-0 bottom-0 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none md:inset-y-0 md:right-0 md:h-auto md:w-[26rem] md:max-w-[94vw] md:rounded-l-2xl md:rounded-tr-none ${
+        className={`pointer-events-auto absolute inset-x-0 bottom-0 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none md:inset-y-0 md:right-0 md:h-auto md:w-[26rem] md:max-w-[94vw] md:rounded-l-2xl md:rounded-tr-none ${
           open
             ? "translate-y-0 md:translate-x-0"
             : "translate-y-full md:translate-y-0 md:translate-x-full"

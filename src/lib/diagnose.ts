@@ -3,17 +3,14 @@ import type { Crop } from "../i18n/translations";
 
 /**
  * Diagnosis engine — SIMULATED for the hackathon MVP.
- * No vision model: a deterministic PRNG seeded from the image file name +
- * crop + timestamp picks one of the 5 bundled diseases and a confidence
- * within the disease's range. Same inputs (minus time) give stable-ish
- * results, which keeps the demo predictable yet varied.
+ * No vision model: a deterministic PRNG seeded from the photo and selected
+ * crop picks a compatible bundled disease and confidence. Repeating a
+ * diagnosis with the same photo and crop produces the same result.
  */
 
 export interface DiagnosisInput {
   imageName: string;
   crop?: Crop | null;
-  /** Millis epoch. */
-  takenAt?: number;
 }
 
 export interface Diagnosis {
@@ -55,10 +52,14 @@ function mulberry32(seed: number): () => number {
  * plus a small jitter, so the demo stays predictable yet varied.
  */
 export function diagnoseLeaf(input: DiagnosisInput, imageDataUrl: string): Diagnosis {
-  const seed = hashString(`${input.imageName}|${input.crop ?? "any"}|${input.takenAt ?? Date.now()}`);
+  const seed = hashString(`${input.crop ?? "any"}|${imageDataUrl}`);
   const rand = mulberry32(seed);
 
-  const ids = DISEASE_IDS as DiseaseId[];
+  const ids = DISEASE_IDS.filter((id) => {
+    const diseaseCrop = DISEASES[id].crop;
+    if (input.crop) return diseaseCrop === input.crop || diseaseCrop === "generic";
+    return diseaseCrop !== "apple";
+  });
   const idx = Math.floor(rand() * ids.length);
   const disease = DISEASES[ids[idx]];
 

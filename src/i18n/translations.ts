@@ -98,6 +98,8 @@ export const en = {
     "You appear to be offline. The AI chat needs a connection — your diagnosis card still works without one.",
   chatErrorServer:
     "We couldn't reach the agronomist right now. Please try again in a moment, or lean on your diagnosis card.",
+  chatErrorConfig:
+    "AI chat isn't configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, deploy the agronomist-chat Edge Function, and set GEMINI_API_KEY in Supabase secrets.",
   chatErrorRate: "That's a lot of questions at once! Give the agronomist a minute, then try again.",
   chatErrorAuth: "Please reload the page to re-connect, then ask again.",
   chatEmpty: "Finish a diagnosis first for grounded answers, or ask a general agronomy question.",
@@ -120,7 +122,7 @@ export const en = {
   /* Footer */
   footerNote: "AgriGuard AI — Hackathon MVP",
   footerDisclaimer:
-    "Diagnoses are simulated for the demo; the AI agronomist chat is powered by OpenAI.",
+    "Diagnoses are simulated for the demo; the AI agronomist chat is powered by Gemini.",
   worksOffline: "Works fully offline",
 };
 
@@ -209,6 +211,8 @@ export const hi: Record<TranslationKey, string> = {
     "आप ऑफ़लाइन दिख रहे हैं। AI चैट के लिए इंटरनेट ज़रूरी है — निदान कार्ड ऑफ़लाइन काम करता है।",
   chatErrorServer:
     "अभी विशेषज्ञ से संपर्क नहीं हो पाया। थोड़ी देर बाद कोशिश करें, या निदान कार्ड पर भरोसा करें।",
+  chatErrorConfig:
+    "AI चैट अभी कॉन्फ़िगर नहीं है। .env.local में VITE_SUPABASE_URL और VITE_SUPABASE_ANON_KEY जोड़ें, agronomist-chat Edge Function डिप्लॉय करें और Supabase secrets में GEMINI_API_KEY सेट करें।",
   chatErrorRate: "एक साथ बहुत सारे सवाल! एक मिनट रुकें, फिर दोबारा पूछें।",
   chatErrorAuth: "पुनः कनेक्ट होने के लिए पेज रीलोड करें।",
   chatEmpty: "जुड़े जवाबों के लिए पहले निदान करें, या सामान्य कृषि सवाल पूछें।",
@@ -227,7 +231,7 @@ export const hi: Record<TranslationKey, string> = {
   offlineBody: "इस डिवाइस पर सहेजा गया अंतिम निदान और उपाय दिखाए जा रहे हैं।",
 
   footerNote: "एग्रीगार्ड AI — हैकाथॉन MVP",
-  footerDisclaimer: "निदान डेमो के लिए सिम्युलेटेड हैं; AI चैट को OpenAI चलाता है।",
+  footerDisclaimer: "निदान डेमो के लिए सिम्युलेटेड हैं; AI चैट को Gemini चलाता है।",
   worksOffline: "पूरी तरह ऑफ़लाइन काम करता है",
 };
 
@@ -313,6 +317,8 @@ export const es: Record<TranslationKey, string> = {
   chatErrorOffline:
     "Parece que estás sin conexión. El chat necesita internet; tu diagnóstico sí funciona sin conexión.",
   chatErrorServer: "No pudimos comunicarnos con el agrónomo. Inténtalo de nuevo en un momento.",
+  chatErrorConfig:
+    "El chat de IA aún no está configurado. Añade VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY a .env.local, despliega la función Edge agronomist-chat y configura GEMINI_API_KEY en los secretos de Supabase.",
   chatErrorRate: "¡Demasiadas preguntas a la vez! Espera un minuto y vuelve a intentarlo.",
   chatErrorAuth: "Recarga la página para reconectar el chat.",
   chatEmpty: "Primero haz un diagnóstico, o pregunta algo general de agronomía.",
@@ -332,7 +338,7 @@ export const es: Record<TranslationKey, string> = {
     "Mostrando el último diagnóstico y sus remedios guardados. Puedes seguirlos en el campo.",
 
   footerNote: "AgriGuard AI — MVP de hackathon",
-  footerDisclaimer: "Los diagnósticos son simulados; el chat de IA funciona con OpenAI.",
+  footerDisclaimer: "Los diagnósticos son simulados; el chat de IA funciona con Gemini.",
   worksOffline: "Funciona sin conexión",
 };
 
