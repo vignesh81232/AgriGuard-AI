@@ -1,0 +1,336 @@
+[1mdiff --git a/.env.example b/.env.example[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3157ab3[m
+[1m--- /dev/null[m
+[1m+++ b/.env.example[m
+[36m@@ -0,0 +1,5 @@[m
+[32m+[m[32m# Public Supabase settings for the browser.[m
+[32m+[m[32mVITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co[m
+[32m+[m[32mVITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY[m
+[32m+[m
+[32m+[m[32m# Do not put GEMINI_API_KEY here. Set it as a Supabase Edge Function secret.[m
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex a547bf3..236f80b 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -22,3 +22,5 @@[m [mdist-ssr[m
+ *.njsproj[m
+ *.sln[m
+ *.sw?[m
+[32m+[m[32m# Supabase local CLI state[m
+[32m+[m[32msupabase/.temp/[m
+[1mdiff --git a/src/components/ChatDrawer.tsx b/src/components/ChatDrawer.tsx[m
+[1mindex bca196f..214ed6f 100644[m
+[1m--- a/src/components/ChatDrawer.tsx[m
+[1m+++ b/src/components/ChatDrawer.tsx[m
+[36m@@ -44,7 +44,7 @@[m [mconst ERROR_KEY: Record<ChatErrorKind, TranslationKey> = {[m
+   rate: "chatErrorRate",[m
+   server: "chatErrorServer",[m
+   "anon-disabled": "chatErrorAuth",[m
+[31m-  "not-configured": "chatErrorServer",[m
+[32m+[m[32m  "not-configured": "chatErrorConfig",[m
+ };[m
+ [m
+ const FOCUSABLE =[m
+[36m@@ -179,7 +179,7 @@[m [mexport default function ChatDrawer({ open, onClose, diagnosis }: Props) {[m
+       <div[m
+         onClick={onClose}[m
+         role="presentation"[m
+[31m-        className={`absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300 ease-out motion-reduce:transition-none ${[m
+[32m+[m[32m        className={`pointer-events-auto absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300 ease-out motion-reduce:transition-none ${[m
+           open ? "opacity-100" : "opacity-0"[m
+         }`}[m
+       />[m
+[36m@@ -190,7 +190,7 @@[m [mexport default function ChatDrawer({ open, onClose, diagnosis }: Props) {[m
+         aria-modal="true"[m
+         aria-labelledby="agrichat-title"[m
+         tabIndex={-1}[m
+[31m-        className={`absolute inset-x-0 bottom-0 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none md:inset-y-0 md:right-0 md:h-auto md:w-[26rem] md:max-w-[94vw] md:rounded-l-2xl md:rounded-tr-none ${[m
+[32m+[m[32m        className={`pointer-events-auto absolute inset-x-0 bottom-0 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none md:inset-y-0 md:right-0 md:h-auto md:w-[26rem] md:max-w-[94vw] md:rounded-l-2xl md:rounded-tr-none ${[m
+           open[m
+             ? "translate-y-0 md:translate-x-0"[m
+             : "translate-y-full md:translate-y-0 md:translate-x-full"[m
+[1mdiff --git a/src/i18n/translations.ts b/src/i18n/translations.ts[m
+[1mindex 6560641..06c6be6 100644[m
+[1m--- a/src/i18n/translations.ts[m
+[1m+++ b/src/i18n/translations.ts[m
+[36m@@ -98,6 +98,8 @@[m [mexport const en = {[m
+     "You appear to be offline. The AI chat needs a connection — your diagnosis card still works without one.",[m
+   chatErrorServer:[m
+     "We couldn't reach the agronomist right now. Please try again in a moment, or lean on your diagnosis card.",[m
+[32m+[m[32m  chatErrorConfig:[m
+[32m+[m[32m    "AI chat isn't configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, deploy the agronomist-chat Edge Function, and set GEMINI_API_KEY in Supabase secrets.",[m
+   chatErrorRate: "That's a lot of questions at once! Give the agronomist a minute, then try again.",[m
+   chatErrorAuth: "Please reload the page to re-connect, then ask again.",[m
+   chatEmpty: "Finish a diagnosis first for grounded answers, or ask a general agronomy question.",[m
+[36m@@ -120,7 +122,7 @@[m [mexport const en = {[m
+   /* Footer */[m
+   footerNote: "AgriGuard AI — Hackathon MVP",[m
+   footerDisclaimer:[m
+[31m-    "Diagnoses are simulated for the demo; the AI agronomist chat is powered by OpenAI.",[m
+[32m+[m[32m    "Diagnoses are simulated for the demo; the AI agronomist chat is powered by Gemini.",[m
+   worksOffline: "Works fully offline",[m
+ };[m
+ [m
+[36m@@ -209,6 +211,8 @@[m [mexport const hi: Record<TranslationKey, string> = {[m
+     "आप ऑफ़लाइन दिख रहे हैं। AI चैट के लिए इंटरनेट ज़रूरी है — निदान कार्ड ऑफ़लाइन काम करता है।",[m
+   chatErrorServer:[m
+     "अभी विशेषज्ञ से संपर्क नहीं हो पाया। थोड़ी देर बाद कोशिश करें, या निदान कार्ड पर भरोसा करें।",[m
+[32m+[m[32m  chatErrorConfig:[m
+[32m+[m[32m    "AI चैट अभी कॉन्फ़िगर नहीं है। .env.local में VITE_SUPABASE_URL और VITE_SUPABASE_ANON_KEY जोड़ें, agronomist-chat Edge Function डिप्लॉय करें और Supabase secrets में GEMINI_API_KEY सेट करें।",[m
+   chatErrorRate: "एक साथ बहुत सारे सवाल! एक मिनट रुकें, फिर दोबारा पूछें।",[m
+   chatErrorAuth: "पुनः कनेक्ट होने के लिए पेज रीलोड करें।",[m
+   chatEmpty: "जुड़े जवाबों के लिए पहले निदान करें, या सामान्य कृषि सवाल पूछें।",[m
+[36m@@ -227,7 +231,7 @@[m [mexport const hi: Record<TranslationKey, string> = {[m
+   offlineBody: "इस डिवाइस पर सहेजा गया अंतिम निदान और उपाय दिखाए जा रहे हैं।",[m
+ [m
+   footerNote: "एग्रीगार्ड AI — हैकाथॉन MVP",[m
+[31m-  footerDisclaimer: "निदान डेमो के लिए सिम्युलेटेड हैं; AI चैट को OpenAI चलाता है।",[m
+[32m+[m[32m  footerDisclaimer: "निदान डेमो के लिए सिम्युलेटेड हैं; AI चैट को Gemini चलाता है।",[m
+   worksOffline: "पूरी तरह ऑफ़लाइन काम करता है",[m
+ };[m
+ [m
+[36m@@ -313,6 +317,8 @@[m [mexport const es: Record<TranslationKey, string> = {[m
+   chatErrorOffline:[m
+     "Parece que estás sin conexión. El chat necesita internet; tu diagnóstico sí funciona sin conexión.",[m
+   chatErrorServer: "No pudimos comunicarnos con el agrónomo. Inténtalo de nuevo en un momento.",[m
+[32m+[m[32m  chatErrorConfig:[m
+[32m+[m[32m    "El chat de IA aún no está configurado. Añade VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY a .env.local, despliega la función Edge agronomist-chat y configura GEMINI_API_KEY en los secretos de Supabase.",[m
+   chatErrorRate: "¡Demasiadas preguntas a la vez! Espera un minuto y vuelve a intentarlo.",[m
+   chatErrorAuth: "Recarga la página para reconectar el chat.",[m
+   chatEmpty: "Primero haz un diagnóstico, o pregunta algo general de agronomía.",[m
+[36m@@ -332,7 +338,7 @@[m [mexport const es: Record<TranslationKey, string> = {[m
+     "Mostrando el último diagnóstico y sus remedios guardados. Puedes seguirlos en el campo.",[m
+ [m
+   footerNote: "AgriGuard AI — MVP de hackathon",[m
+[31m-  footerDisclaimer: "Los diagnósticos son simulados; el chat de IA funciona con OpenAI.",[m
+[32m+[m[32m  footerDisclaimer: "Los diagnósticos son simulados; el chat de IA funciona con Gemini.",[m
+   worksOffline: "Funciona sin conexión",[m
+ };[m
+ [m
+[1mdiff --git a/src/lib/diagnose.ts b/src/lib/diagnose.ts[m
+[1mindex 1279d1d..9e7781b 100644[m
+[1m--- a/src/lib/diagnose.ts[m
+[1m+++ b/src/lib/diagnose.ts[m
+[36m@@ -3,17 +3,14 @@[m [mimport type { Crop } from "../i18n/translations";[m
+ [m
+ /**[m
+  * Diagnosis engine — SIMULATED for the hackathon MVP.[m
+[31m- * No vision model: a deterministic PRNG seeded from the image file name +[m
+[31m- * crop + timestamp picks one of the 5 bundled diseases and a confidence[m
+[31m- * within the disease's range. Same inputs (minus time) give stable-ish[m
+[31m- * results, which keeps the demo predictable yet varied.[m
+[32m+[m[32m * No vision model: a deterministic PRNG seeded from the photo and selected[m
+[32m+[m[32m * crop picks a compatible bundled disease and confidence. Repeating a[m
+[32m+[m[32m * diagnosis with the same photo and crop produces the same result.[m
+  */[m
+ [m
+ export interface DiagnosisInput {[m
+   imageName: string;[m
+   crop?: Crop | null;[m
+[31m-  /** Millis epoch. */[m
+[31m-  takenAt?: number;[m
+ }[m
+ [m
+ export interface Diagnosis {[m
+[36m@@ -55,10 +52,14 @@[m [mfunction mulberry32(seed: number): () => number {[m
+  * plus a small jitter, so the demo stays predictable yet varied.[m
+  */[m
+ export function diagnoseLeaf(input: DiagnosisInput, imageDataUrl: string): Diagnosis {[m
+[31m-  const seed = hashString(`${input.imageName}|${input.crop ?? "any"}|${input.takenAt ?? Date.now()}`);[m
+[32m+[m[32m  const seed = hashString(`${input.crop ?? "any"}|${imageDataUrl}`);[m
+   const rand = mulberry32(seed);[m
+ [m
+[31m-  const ids = DISEASE_IDS as DiseaseId[];[m
+[32m+[m[32m  const ids = DISEASE_IDS.filter((id) => {[m
+[32m+[m[32m    const diseaseCrop = DISEASES[id].crop;[m
+[32m+[m[32m    if (input.crop) return diseaseCrop === input.crop || diseaseCrop === "generic";[m
+[32m+[m[32m    return diseaseCrop !== "apple";[m
+[32m+[m[32m  });[m
+   const idx = Math.floor(rand() * ids.length);[m
+   const disease = DISEASES[ids[idx]];[m
+ [m
+[1mdiff --git a/src/lib/supabase.ts b/src/lib/supabase.ts[m
+[1mindex ac07623..0c551ba 100644[m
+[1m--- a/src/lib/supabase.ts[m
+[1m+++ b/src/lib/supabase.ts[m
+[36m@@ -10,7 +10,7 @@[m [mimport {[m
+  * Supabase client + the "Ask AI Agronomist" gateway.[m
+  *[m
+  * Public values only: the URL and the publishable anon key come from[m
+[31m- * VITE_* environment variables (safe to ship to the browser). The OpenAI key[m
+[32m+[m[32m * VITE_* environment variables (safe to ship to the browser). The Gemini key[m
+  * is a server-side secret and never enters this file or any client bundle.[m
+  */[m
+ [m
+[36m@@ -41,10 +41,10 @@[m [mexport interface ChatDiagnosisContext {[m
+ export type ChatErrorKind =[m
+   | "offline" // no network[m
+   | "auth" // invalid/missing session (JWT)[m
+[31m-  | "rate" // 429 — both our bucket and OpenAI's[m
+[32m+[m[32m  | "rate" // 429 — both our bucket and Gemini's[m
+   | "server" // upstream/timeout/generic[m
+   | "anon-disabled" // project-level anonymous sign-in is off[m
+[31m-  | "not-configured"; // function lacks its secret[m
+[32m+[m[32m  | "not-configured"; // Supabase function or Gemini key is not configured[m
+ [m
+ export type AskResult =[m
+   | { ok: true; reply: string }[m
+[36m@@ -90,7 +90,7 @@[m [mfunction mapInvokeError(error: FunctionsError | Error): ChatErrorKind {[m
+       0;[m
+     if (status === 401 || status === 403) return "auth";[m
+     if (status === 429) return "rate";[m
+[31m-    if (status === 503) return "not-configured";[m
+[32m+[m[32m    if (status === 404 || status === 503) return "not-configured";[m
+     return "server";[m
+   }[m
+   if (error instanceof FunctionsFetchError) {[m
+[1mdiff --git a/supabase/config.toml b/supabase/config.toml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..ddf541d[m
+[1m--- /dev/null[m
+[1m+++ b/supabase/config.toml[m
+[36m@@ -0,0 +1,4 @@[m
+[32m+[m[32mproject_id = "agriguard-ai"[m
+[32m+[m
+[32m+[m[32m[functions.agronomist-chat][m
+[32m+[m[32mverify_jwt = true[m
+[1mdiff --git a/supabase/functions/agronomist-chat/index.ts b/supabase/functions/agronomist-chat/index.ts[m
+[1mindex 9d68baf..b935a3f 100644[m
+[1m--- a/supabase/functions/agronomist-chat/index.ts[m
+[1m+++ b/supabase/functions/agronomist-chat/index.ts[m
+[36m@@ -3,10 +3,9 @@[m [mimport { createClient } from "npm:@supabase/supabase-js@2";[m
+ /**[m
+  * AgriGuard AI — "Ask AI Agronomist" Edge Function.[m
+  *[m
+[31m- * The ONLY network-backed feature of the app. The OpenAI key lives here as a[m
+[31m- * Supabase secret (OPENAI_API_KEY) and is read via Deno.env.get() — it never[m
+[31m- * reaches the browser. The client is prohibited from calling api.openai.com[m
+[31m- * directly; it only ever POSTs here with a valid Supabase JWT.[m
+[32m+[m[32m * The ONLY network-backed feature of the app. The Gemini key lives here as a[m
+[32m+[m[32m * Supabase secret (GEMINI_API_KEY) and is read via Deno.env.get() — it never[m
+[32m+[m[32m * reaches the browser. The client only POSTs here with a valid Supabase JWT.[m
+  *[m
+  * Auth: a valid Supabase JWT (Bearer header) is required and verified[m
+  * server-side via supabase.auth.getUser(). Anonymous sign-in on the Supabase[m
+[36m@@ -15,11 +14,11 @@[m [mimport { createClient } from "npm:@supabase/supabase-js@2";[m
+  * Rate limiting: simple in-process token bucket (10 requests / 60 s per user).[m
+  */[m
+ [m
+[31m-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";[m
+[31m-const MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";[m
+[32m+[m[32mconst GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";[m
+[32m+[m[32mconst MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";[m
+ const RATE_LIMIT_MAX = 10; // requests[m
+ const RATE_LIMIT_WINDOW_SEC = 60; // seconds[m
+[31m-const MAX_HISTORY = 20; // messages sent to OpenAI[m
+[32m+[m[32mconst MAX_HISTORY = 20; // messages sent to Gemini[m
+ const MAX_CONTENT_CHARS = 4000; // per message[m
+ const MAX_CONTEXT_CHARS = 1200; // diagnosis context blob[m
+ [m
+[36m@@ -29,9 +28,8 @@[m [mconst corsHeaders = {[m
+   "Access-Control-Allow-Methods": "POST, OPTIONS",[m
+ };[m
+ [m
+[31m-type Role = "system" | "user" | "assistant";[m
+ interface ChatMessage {[m
+[31m-  role: Role;[m
+[32m+[m[32m  role: "user" | "assistant";[m
+   content: string;[m
+ }[m
+ interface DiagnosisContext {[m
+[36m@@ -89,12 +87,13 @@[m [mfunction buildSystemPrompt(context: unknown): string {[m
+   const base =[m
+     'You are "AgriGuard AI", a friendly, practical agronomist embedded in a farmer\'s leaf-diagnosis app. ' +[m
+     "Follow these rules:\n" +[m
+[31m-    "1. Answer in the same language the farmer used (English, हिंदी or Español).\n" +[m
+[32m+[m[32m    "1. Answer naturally in the same language the farmer used (English, हिंदी or Español).\n" +[m
+     "2. Keep answers concise and actionable — short paragraphs or bullet lists, under ~180 words unless asked for more detail.\n" +[m
+[31m-    '3. When a diagnosis context is provided, treat it as the app\'s analysis of their leaf and answer with it in mind: acknowledge it briefly, then answer the question.\n' +[m
+[31m-    "4. For chemical treatments, give practical guidance only, never invent brand claims — always tell the farmer to read the product label and consult a local agronomist for exact doses.\n" +[m
+[31m-    "5. If the question is outside your knowledge, say so honestly instead of guessing.\n" +[m
+[31m-    "6. Do not claim to be able to see photos other than the attached diagnosis context.";[m
+[32m+[m[32m    "3. When diagnosis context is attached, explicitly use its crop and disease to tailor the answer. Connect recommendations to this crop-disease combination and reported severity; do not give only generic crop advice.\n" +[m
+[32m+[m[32m    "4. Treat the diagnosis as an estimate, not a confirmed lab result. Be transparent about its confidence and do not claim to have visually inspected the photo.\n" +[m
+[32m+[m[32m    "5. If the crop or diagnosis is missing, do not guess; ask a brief clarifying question when needed.\n" +[m
+[32m+[m[32m    "6. For chemical treatments, give practical guidance only, never invent brand claims — always tell the farmer to read the product label and consult a local agronomist for exact doses.\n" +[m
+[32m+[m[32m    "7. If the question is outside your knowledge, say so honestly instead of guessing.";[m
+   let contextBlob = "";[m
+   if (context && typeof context === "object") {[m
+     try {[m
+[36m@@ -104,7 +103,7 @@[m [mfunction buildSystemPrompt(context: unknown): string {[m
+     }[m
+   }[m
+   if (contextBlob) {[m
+[31m-    return `${base}\n\nCurrent diagnosis context (JSON; crop, disease, severity, confidence):\n${contextBlob}`;[m
+[32m+[m[32m    return `${base}\n\nUse this current diagnosis as the context for the conversation (JSON; crop, disease, severity, confidence):\n${contextBlob}`;[m
+   }[m
+   return `${base}\n\n(No diagnosis attached — the farmer may still ask general agronomy questions.)`;[m
+ }[m
+[36m@@ -161,28 +160,27 @@[m [mDeno.serve(async (req: Request) => {[m
+   }[m
+ [m
+   const system = buildSystemPrompt(diagnosisContext);[m
+[31m-  const openAiMessages: ChatMessage[] = [{ role: "system", content: system }, ...history];[m
+[31m-[m
+[31m-  // ---- 4. Call OpenAI (server-side only) ----[m
+[31m-  const apiKey = Deno.env.get("OPENAI_API_KEY");[m
+[32m+[m[32m  // ---- 4. Call Gemini (server-side only) ----[m
+[32m+[m[32m  const apiKey = Deno.env.get("GEMINI_API_KEY");[m
+   if (!apiKey) {[m
+[31m-    return json({ error: "not_configured", message: "server chat is not configured" }, 503);[m
+[32m+[m[32m    return json({ error: "not_configured", message: "Gemini is not configured" }, 503);[m
+   }[m
+ [m
+   let upstream: Response;[m
+   try {[m
+[31m-    upstream = await fetch(OPENAI_URL, {[m
+[32m+[m[32m    upstream = await fetch(`${GEMINI_URL}/${encodeURIComponent(MODEL)}:generateContent`, {[m
+       method: "POST",[m
+       headers: {[m
+         "Content-Type": "application/json",[m
+[31m-        Authorization: `Bearer ${apiKey}`,[m
+[32m+[m[32m        "x-goog-api-key": apiKey,[m
+       },[m
+       body: JSON.stringify({[m
+[31m-        model: MODEL,[m
+[31m-        messages: openAiMessages,[m
+[31m-        temperature: 0.3,[m
+[31m-        max_tokens: 700,[m
+[31m-        stream: false,[m
+[32m+[m[32m        systemInstruction: { parts: [{ text: system }] },[m
+[32m+[m[32m        contents: history.map((message) => ({[m
+[32m+[m[32m          role: message.role === "assistant" ? "model" : "user",[m
+[32m+[m[32m          parts: [{ text: message.content }],[m
+[32m+[m[32m        })),[m
+[32m+[m[32m        generationConfig: { temperature: 0.3, maxOutputTokens: 700 },[m
+       }),[m
+       signal: AbortSignal.timeout(30_000),[m
+     });[m
+[36m@@ -194,7 +192,10 @@[m [mDeno.serve(async (req: Request) => {[m
+   }[m
+ [m
+   if (!upstream.ok) {[m
+[31m-    // Never forward the key or upstream body — keep the client payload minimal.[m
+[32m+[m[32m    // Keep provider errors and credentials out of the client response.[m
+[32m+[m[32m    if (upstream.status === 401 || upstream.status === 403) {[m
+[32m+[m[32m      return json({ error: "not_configured", message: "Gemini API key is invalid" }, 503);[m
+[32m+[m[32m    }[m
+     if (upstream.status === 429) {[m
+       return json({ error: "upstream_rate_limit" }, 502);[m
+     }[m
+[36m@@ -203,9 +204,12 @@[m [mDeno.serve(async (req: Request) => {[m
+ [m
+   try {[m
+     const data = (await upstream.json()) as {[m
+[31m-      choices?: { message?: { content?: string } }[];[m
+[32m+[m[32m      candidates?: { content?: { parts?: { text?: string }[] } }[];[m
+     };[m
+[31m-    const reply = (data.choices?.[0]?.message?.content ?? "").trim();[m
+[32m+[m[32m    const reply = (data.candidates?.[0]?.content?.parts ?? [])[m
+[32m+[m[32m      .map((part) => part.text ?? "")[m
+[32m+[m[32m      .join("")[m
+[32m+[m[32m      .trim();[m
+     if (!reply) return json({ error: "upstream_error", message: "empty reply" }, 502);[m
+     return json({ reply });[m
+   } catch {[m
