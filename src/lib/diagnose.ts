@@ -21,8 +21,6 @@ export interface Diagnosis {
   imageName: string;
   crop: Crop | null;
   createdAt: number;
-  /** True when restored from the offline cache rather than freshly computed. */
-  fromCache?: boolean;
 }
 
 /** Deterministic 32-bit string hash (FNV-1a), used as PRNG seed. */
@@ -77,36 +75,12 @@ export function diagnoseLeaf(input: DiagnosisInput, imageDataUrl: string): Diagn
   };
 }
 
-/* ---------------- offline cache ---------------- */
-
-const CACHE_KEY = "agriguard:last-diagnosis";
-
-export function cacheDiagnosis(d: Diagnosis): void {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(d));
-  } catch {
-    /* storage full / unavailable — non-fatal */
-  }
-}
-
-export function loadCachedDiagnosis(): Diagnosis | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Diagnosis;
-    if (!parsed || !parsed.diseaseId || typeof parsed.imageDataUrl !== "string") return null;
-    return { ...parsed, imageName: parsed.imageName ?? "cached.jpg", fromCache: true };
-  } catch {
-    return null;
-  }
-}
-
-const MAX_EDGE = 960; // px — keep cached images small enough for localStorage
+const MAX_EDGE = 960; // px — keep saved diagnosis history compact
 
 /**
  * Read a File and return a downscaled JPEG dataURL (max 960px on the long
- * edge). Downscaling keeps the offline cache small enough to save reliably
- * even for phone-camera photos.
+ * edge). Downscaling keeps per-account history storage compact, including
+ * photos captured at full phone-camera resolution.
  */
 export function fileToImageData(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

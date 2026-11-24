@@ -76,6 +76,13 @@ export const ImagePlusIcon = (p: IconProps) => (
   </Base>
 );
 
+export const EditIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+  </Base>
+);
+
 export const XIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M18 6 6 18" />
@@ -148,6 +155,13 @@ export const CheckCircleIcon = (p: IconProps) => (
   </Base>
 );
 
+export const UserIcon = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M5 21a7 7 0 0 1 14 0" />
+  </Base>
+);
+
 export const AlertTriangleIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -188,17 +202,6 @@ export const WifiIcon = (p: IconProps) => (
   </Base>
 );
 
-export const BotIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M12 8V4H8" />
-    <rect width="16" height="12" x="4" y="8" rx="2" />
-    <path d="M2 14h2" />
-    <path d="M20 14h2" />
-    <path d="M15 13v2" />
-    <path d="M9 13v2" />
-  </Base>
-);
-
 export const MessageCircleIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
@@ -216,13 +219,6 @@ export const InfoIcon = (p: IconProps) => (
     <circle cx="12" cy="12" r="10" />
     <path d="M12 16v-4" />
     <path d="M12 8h.01" />
-  </Base>
-);
-
-export const ClockIcon = (p: IconProps) => (
-  <Base {...p}>
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
   </Base>
 );
 

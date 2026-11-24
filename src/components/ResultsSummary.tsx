@@ -2,7 +2,7 @@ import { useI18n } from "../i18n";
 import { Pill } from "../i18n";
 import { getDisease, getLocalized } from "../data/diseases";
 import type { Diagnosis } from "../lib/diagnose";
-import { AlertTriangleIcon, CheckCircleIcon, ClockIcon } from "./icons";
+import { AlertTriangleIcon, CheckCircleIcon } from "./icons";
 
 /**
  * Compact summary of a finished diagnosis: disease name, type, confidence,
@@ -47,14 +47,6 @@ export default function ResultsSummary({ diagnosis }: { diagnosis: Diagnosis }) 
     <section aria-label={t("resultsTitle")}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-heading text-xl text-foreground">{t("resultsTitle")}</h2>
-        <div className="flex items-center gap-2">
-          {diagnosis.fromCache ? (
-            <Pill tone="primary">
-              <ClockIcon size={13} />
-              {t("cachedBadge")}
-            </Pill>
-          ) : null}
-        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">

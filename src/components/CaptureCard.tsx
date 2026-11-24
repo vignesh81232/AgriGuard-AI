@@ -4,7 +4,7 @@ import { useI18n } from "../i18n";
 import { CROPS, type Crop, type TranslationKey } from "../i18n/translations";
 import { CameraIcon, ImagePlusIcon, MicIcon, SpinnerIcon, XIcon } from "./icons";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
-import { cacheDiagnosis, diagnoseLeaf, fileToImageData, type Diagnosis } from "../lib/diagnose";
+import { diagnoseLeaf, fileToImageData, type Diagnosis } from "../lib/diagnose";
 
 const CROP_KEYS: Record<Crop, TranslationKey> = {
   tomato: "cropTomato",
@@ -68,7 +68,6 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
     // Small artificial pause so the "scanning" moment feels real.
     await new Promise((r) => setTimeout(r, 1100));
     const result = diagnoseLeaf({ imageName, crop: crop || null }, imageDataUrl);
-    cacheDiagnosis(result);
     setAnalyzing(false);
     onDiagnose(result);
   }, [imageDataUrl, imageName, crop, analyzing, onDiagnose]);

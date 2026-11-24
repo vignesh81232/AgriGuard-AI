@@ -9,11 +9,11 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from "react";
-import { en, hi, es, LANGUAGES, type Lang, type TranslationKey } from "./translations";
+import { en, hi, es, kn, LANGUAGES, type Lang, type TranslationKey } from "./translations";
 
 type Dict = Record<TranslationKey, string>;
 
-const DICTS: Record<Lang, Dict> = { en, hi, es };
+const DICTS: Record<Lang, Dict> = { en, hi, es, kn };
 
 export interface I18n {
   lang: Lang;
@@ -31,13 +31,14 @@ const STORAGE_KEY = "agriguard:lang";
 function detectInitialLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "hi" || stored === "es") return stored;
+    if (stored === "en" || stored === "hi" || stored === "es" || stored === "kn") return stored;
   } catch {
     /* storage unavailable */
   }
   const nav = typeof navigator !== "undefined" ? navigator.language : "";
   if (nav.toLowerCase().startsWith("hi")) return "hi";
   if (nav.toLowerCase().startsWith("es")) return "es";
+  if (nav.toLowerCase().startsWith("kn")) return "kn";
   return "en";
 }
 
