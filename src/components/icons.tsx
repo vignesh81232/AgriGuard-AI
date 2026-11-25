@@ -90,6 +90,15 @@ export const XIcon = (p: IconProps) => (
   </Base>
 );
 
+export const TrashIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M3 6h18" />
+    <path d="M8 6V4h8v2" />
+    <path d="m19 6-1 14H6L5 6" />
+    <path d="M10 11v5M14 11v5" />
+  </Base>
+);
+
 export const WifiOffIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M12 20h.01" />

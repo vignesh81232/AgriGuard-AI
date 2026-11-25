@@ -10,24 +10,28 @@ import type { Crop, TranslationKey } from "./i18n/translations";
 import type { Diagnosis } from "./lib/diagnose";
 import {
   getLocalSession,
+  deleteDiagnosisForAccount,
   loadDiagnosisHistory,
   saveDiagnosisForAccount,
   signOutLocalAccount,
   type DiagnosisHistoryEntry,
 } from "./lib/localAccounts";
 import { useI18n } from "./i18n";
-import { WifiOffIcon, ArrowDownIcon, EditIcon, LeafIcon } from "./components/icons";
+import { WifiOffIcon, ArrowDownIcon, EditIcon, LeafIcon, TrashIcon } from "./components/icons";
 
 const CROP_KEYS: Record<Crop, TranslationKey> = {
   tomato: "cropTomato",
   corn: "cropCorn",
   potato: "cropPotato",
   rice: "cropRice",
+  wheat: "cropWheat",
+  apple: "cropApple",
+  grape: "cropGrape",
 };
 
 /**
  * AgriGuard AI — mobile-first leaf disease diagnoser (hackathon MVP).
- * Diagnose path: capture → simulated engine → summary → dashboard → remedies
+ * Diagnose path: capture → local model → summary → dashboard → remedies
  * store locator. Accounts and history are kept in this browser.
  */
 export default function App() {
@@ -38,6 +42,8 @@ export default function App() {
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [history, setHistory] = useState<DiagnosisHistoryEntry[]>([]);
   const [historySaveError, setHistorySaveError] = useState(false);
+  const [historyDeleteError, setHistoryDeleteError] = useState(false);
+  const [deletingHistoryId, setDeletingHistoryId] = useState<string | null>(null);
   const [captureKey, setCaptureKey] = useState(0);
   const [offline, setOffline] = useState<boolean>(() => !navigator.onLine);
 
@@ -95,6 +101,26 @@ export default function App() {
     }
   };
 
+  const handleDeleteRecent = async (entry: DiagnosisHistoryEntry) => {
+    if (!username || deletingHistoryId || !window.confirm(t("historyDeleteConfirm"))) return;
+
+    setDeletingHistoryId(entry.id);
+    setHistoryDeleteError(false);
+    try {
+      await deleteDiagnosisForAccount(username, entry.id);
+      const remaining = history.filter((item) => item.id !== entry.id);
+      setHistory(remaining);
+      if (diagnosis === entry.diagnosis) {
+        setDiagnosis(remaining[0]?.diagnosis ?? null);
+        if (remaining.length === 0) setCaptureKey((key) => key + 1);
+      }
+    } catch {
+      setHistoryDeleteError(true);
+    } finally {
+      setDeletingHistoryId(null);
+    }
+  };
+
   const handleSignOut = () => {
     try {
       signOutLocalAccount();
@@ -142,26 +168,38 @@ export default function App() {
                   setCaptureKey((key) => key + 1);
                   document.getElementById("app-home")?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-sm font-semibold text-foreground/80 transition-colors hover:bg-muted"
+                className="flex min-h-11 w-full cursor-pointer items-center rounded-xl border border-border bg-white px-3 py-2 text-left text-sm font-semibold text-foreground/80 shadow-sm transition-colors hover:border-primary-300 hover:bg-primary-200/20"
               >
                 <EditIcon size={17} className="mr-2 shrink-0" />
                 {t("navNewConversation")}
               </button>
             </nav>
 
-            <section className="mt-5 pt-1" aria-labelledby="recents-heading">
+            <section
+              className="mt-4 rounded-xl border border-border bg-white/80 p-2.5 shadow-sm"
+              aria-labelledby="recents-heading"
+            >
               <h2
                 id="recents-heading"
-                className="mb-2 px-3 text-xs font-bold uppercase tracking-wide text-foreground/50"
+                className="mb-2 px-2 text-xs font-bold uppercase tracking-wide text-foreground/50"
               >
                 {t("navRecents")}
               </h2>
+              {historyDeleteError ? (
+                <p role="alert" className="mb-2 rounded-lg bg-severity-critical/10 px-2 py-2 text-xs text-severity-critical">
+                  {t("historyDeleteError")}
+                </p>
+              ) : null}
               {history.length === 0 ? (
-                <p className="px-3 py-2 text-sm leading-relaxed text-foreground/55">{t("historyEmpty")}</p>
+                <p className="px-2 py-2 text-sm leading-relaxed text-foreground/55">{t("historyEmpty")}</p>
               ) : (
                 <ul className="space-y-1">
                   {history.map((entry) => {
                     const disease = getLocalized(getDisease(entry.diagnosis.diseaseId), lang);
+                    const diagnosisName =
+                      entry.diagnosis.diseaseId === "unclassified-disease"
+                        ? entry.diagnosis.modelLabel ?? disease.name
+                        : disease.name;
                     const cropLabel = entry.diagnosis.crop
                       ? t(CROP_KEYS[entry.diagnosis.crop])
                       : t("historyCropUnknown");
@@ -170,25 +208,39 @@ export default function App() {
                     }).format(entry.createdAt);
                     return (
                       <li key={entry.id}>
-                        <button
-                          type="button"
-                          aria-label={`${t("historyOpen")}: ${disease.name}`}
-                          aria-pressed={diagnosis === entry.diagnosis}
-                          onClick={() => {
-                            setDiagnosis(entry.diagnosis);
-                            document.getElementById("app-home")?.scrollIntoView({ behavior: "smooth" });
-                          }}
-                          className={`w-full cursor-pointer border-l-2 px-3 py-2 text-left transition-colors ${
+                        <div
+                          className={`flex items-center rounded-lg border-l-2 transition-colors ${
                             diagnosis === entry.diagnosis
-                              ? "border-primary text-primary-800"
-                              : "border-transparent text-foreground/75 hover:border-border hover:text-foreground"
+                              ? "border-primary bg-primary-200/20 text-primary-800"
+                              : "border-transparent text-foreground/75 hover:bg-muted"
                           }`}
                         >
-                          <span className="block truncate text-sm font-semibold">{disease.name}</span>
-                          <span className="mt-0.5 block truncate text-xs text-foreground/50">
-                            {cropLabel} · {date}
-                          </span>
-                        </button>
+                          <button
+                            type="button"
+                            aria-label={`${t("historyOpen")}: ${diagnosisName}`}
+                            aria-pressed={diagnosis === entry.diagnosis}
+                            onClick={() => {
+                              setDiagnosis(entry.diagnosis);
+                              document.getElementById("app-home")?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                            className="min-w-0 flex-1 cursor-pointer px-2 py-2 text-left"
+                          >
+                            <span className="block truncate text-sm font-semibold">{diagnosisName}</span>
+                            <span className="mt-0.5 block truncate text-xs text-foreground/50">
+                              {cropLabel} · {date}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${t("historyDeleteAction")}: ${diagnosisName}`}
+                            title={t("historyDeleteAction")}
+                            disabled={deletingHistoryId === entry.id}
+                            onClick={() => void handleDeleteRecent(entry)}
+                            className="mr-1 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground/45 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical disabled:cursor-wait disabled:opacity-50"
+                          >
+                            <TrashIcon size={16} />
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
@@ -200,10 +252,6 @@ export default function App() {
           <main id="app-home" className="mx-auto w-full max-w-2xl min-w-0 px-0 pb-8 pt-1">
             {!diagnosis ? (
               <section className="mb-6 text-center">
-                <p className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary-300 bg-primary-200/50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary-800">
-                  <LeafIcon size={14} />
-                  {t("heroBadge")}
-                </p>
                 <h1 className="font-heading text-3xl leading-tight text-foreground">{t("heroTitle")}</h1>
                 <p className="mx-auto mt-2 max-w-md text-base text-foreground/70">{t("heroSubtitle")}</p>
               </section>
@@ -231,7 +279,6 @@ export default function App() {
             {!diagnosis ? (
               <CaptureCard
                 key={captureKey}
-                busy={!!offline}
                 onDiagnose={(result) => void handleDiagnose(result)}
               />
             ) : null}
@@ -258,16 +305,6 @@ export default function App() {
               </section>
             )}
 
-            {!diagnosis ? (
-              <footer className="mt-12 border-t border-border pt-6 text-center text-xs text-foreground/55">
-                <p className="font-semibold">{t("footerNote")}</p>
-                <p className="mx-auto mt-1 max-w-md">{t("footerDisclaimer")}</p>
-                <p className="mt-2 inline-flex items-center gap-1 text-primary-600">
-                  <WifiOffIcon size={14} />
-                  {t("worksOffline")}
-                </p>
-              </footer>
-            ) : null}
           </main>
         </div>
       )}

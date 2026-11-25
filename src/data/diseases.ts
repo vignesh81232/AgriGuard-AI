@@ -1,18 +1,16 @@
 import type { Lang } from "../i18n/translations";
 
-/**
- * Simulated diagnosis knowledge base (hackathon MVP — no real CV).
- * Each disease has fully localized copy in EN / HI / ES / KN.
- */
+/** Curated crop-disease guidance shown for supported model predictions. */
 
 export type DiseaseId =
   | "tomato-late-blight"
   | "corn-common-rust"
   | "rice-blast"
   | "apple-scab"
-  | "healthy-leaf";
+  | "healthy-leaf"
+  | "unclassified-disease";
 
-export type Severity = "mild" | "moderate" | "critical" | "healthy";
+export type Severity = "mild" | "moderate" | "critical" | "healthy" | "unknown";
 
 export interface LocalizedBlock {
   name: string;
@@ -25,10 +23,7 @@ export interface LocalizedBlock {
 export interface Disease {
   id: DiseaseId;
   crop: "tomato" | "corn" | "potato" | "rice" | "apple" | "generic";
-  family: "fungal" | "bacterial" | "viral" | "pest" | "none";
-  defaultSeverity: Severity;
-  /** Simulated confidence range (low–high). */
-  confidenceRange: [number, number];
+  family: "fungal" | "bacterial" | "viral" | "pest" | "none" | "unknown";
   en: LocalizedBlock;
   hi: LocalizedBlock;
   es: LocalizedBlock;
@@ -40,8 +35,6 @@ export const DISEASES: Record<DiseaseId, Disease> = {
     id: "tomato-late-blight",
     crop: "tomato",
     family: "fungal",
-    defaultSeverity: "critical",
-    confidenceRange: [88, 97],
     en: {
       name: "Tomato Late Blight",
       description:
@@ -114,8 +107,6 @@ export const DISEASES: Record<DiseaseId, Disease> = {
     id: "corn-common-rust",
     crop: "corn",
     family: "fungal",
-    defaultSeverity: "moderate",
-    confidenceRange: [82, 94],
     en: {
       name: "Corn Common Rust",
       description:
@@ -188,8 +179,6 @@ export const DISEASES: Record<DiseaseId, Disease> = {
     id: "rice-blast",
     crop: "rice",
     family: "fungal",
-    defaultSeverity: "moderate",
-    confidenceRange: [84, 95],
     en: {
       name: "Rice Blast",
       description:
@@ -262,8 +251,6 @@ export const DISEASES: Record<DiseaseId, Disease> = {
     id: "apple-scab",
     crop: "apple",
     family: "fungal",
-    defaultSeverity: "mild",
-    confidenceRange: [78, 92],
     en: {
       name: "Apple Scab",
       description:
@@ -336,8 +323,6 @@ export const DISEASES: Record<DiseaseId, Disease> = {
     id: "healthy-leaf",
     crop: "generic",
     family: "none",
-    defaultSeverity: "healthy",
-    confidenceRange: [88, 96],
     en: {
       name: "Healthy Leaf",
       description:
@@ -400,6 +385,75 @@ export const DISEASES: Record<DiseaseId, Disease> = {
         "ವಾರಕ್ಕೊಮ್ಮೆ ಎಲೆಗಳ ಕೆಳಭಾಗವನ್ನು ಪರಿಶೀಲಿಸಿ.",
         "ಹೊಲವನ್ನು ಕಳೆ ಮತ್ತು ನಿಂತ ನೀರಿನಿಂದ ಮುಕ್ತವಾಗಿಡಿ.",
         "ಮಣ್ಣಿನ ಆರೋಗ್ಯ ಕಾಪಾಡಲು ಪ್ರತಿ ಋತುವಿನಲ್ಲಿ ಬೆಳೆ ಪರಿವರ್ತನೆ ಮಾಡಿ.",
+      ],
+    },
+  },
+  "unclassified-disease": {
+    id: "unclassified-disease",
+    crop: "generic",
+    family: "unknown",
+    en: {
+      name: "Possible crop disease",
+      description:
+        "The image model flagged a possible issue, but this condition does not have a verified guide in AgriGuard.",
+      organic: [
+        "Take clear photos of both sides of the leaf and monitor whether symptoms spread.",
+        "Avoid applying pesticides based only on this automated prediction.",
+        "Ask a local agricultural extension worker to confirm the diagnosis before treating the crop.",
+      ],
+      chemical: { product: "Not recommended without confirmation", dose: "—" },
+      prevention: [
+        "Check nearby plants for similar symptoms.",
+        "Keep leaves dry when watering and allow air to circulate between plants.",
+        "Use locally recommended practices for the selected crop.",
+      ],
+    },
+    hi: {
+      name: "संभावित फसल रोग",
+      description:
+        "चित्र मॉडल ने संभावित समस्या बताई है, लेकिन AgriGuard में इस स्थिति के लिए सत्यापित मार्गदर्शन उपलब्ध नहीं है।",
+      organic: [
+        "पत्ती के दोनों ओर की साफ़ तस्वीरें लें और लक्षणों के फैलने पर नज़र रखें।",
+        "केवल इस स्वचालित अनुमान के आधार पर कीटनाशक न डालें।",
+        "फसल का उपचार करने से पहले स्थानीय कृषि विशेषज्ञ से निदान की पुष्टि करें।",
+      ],
+      chemical: { product: "पुष्टि के बिना उपयोग न करें", dose: "—" },
+      prevention: [
+        "पास के पौधों में ऐसे ही लक्षण देखें।",
+        "पानी देते समय पत्तियों को गीला न करें और पौधों के बीच हवा आने दें।",
+        "चुनी गई फसल के लिए स्थानीय रूप से सुझाए गए तरीके अपनाएँ।",
+      ],
+    },
+    es: {
+      name: "Posible enfermedad del cultivo",
+      description:
+        "El modelo de imagen señaló un posible problema, pero AgriGuard no tiene una guía verificada para esta condición.",
+      organic: [
+        "Toma fotos claras de ambos lados de la hoja y observa si los síntomas se extienden.",
+        "No apliques pesticidas basándote únicamente en esta predicción automática.",
+        "Pide a un servicio agrícola local que confirme el diagnóstico antes de tratar el cultivo.",
+      ],
+      chemical: { product: "No recomendado sin confirmación", dose: "—" },
+      prevention: [
+        "Revisa si hay síntomas similares en las plantas cercanas.",
+        "Evita mojar las hojas al regar y deja circular el aire entre las plantas.",
+        "Sigue las prácticas recomendadas localmente para el cultivo seleccionado.",
+      ],
+    },
+    kn: {
+      name: "ಬೆಳೆಗೆ ಸಂಭವನೀಯ ರೋಗ",
+      description:
+        "ಚಿತ್ರ ಮಾದರಿಯು ಸಂಭವನೀಯ ಸಮಸ್ಯೆಯನ್ನು ಗುರುತಿಸಿದೆ, ಆದರೆ ಈ ಸ್ಥಿತಿಗೆ AgriGuard ನಲ್ಲಿ ಪರಿಶೀಲಿತ ಮಾರ್ಗದರ್ಶಿ ಇಲ್ಲ.",
+      organic: [
+        "ಎಲೆಯ ಎರಡೂ ಬದಿಗಳ ಸ್ಪಷ್ಟ ಚಿತ್ರಗಳನ್ನು ತೆಗೆದು, ಲಕ್ಷಣಗಳು ಹರಡುತ್ತಿವೆಯೇ ಗಮನಿಸಿ.",
+        "ಈ ಸ್ವಯಂಚಾಲಿತ ಊಹೆಯ ಆಧಾರದ ಮೇಲೆ ಮಾತ್ರ ಕೀಟನಾಶಕಗಳನ್ನು ಬಳಸಬೇಡಿ.",
+        "ಬೆಳೆಗೆ ಚಿಕಿತ್ಸೆ ನೀಡುವ ಮೊದಲು ಸ್ಥಳೀಯ ಕೃಷಿ ತಜ್ಞರಿಂದ ರೋಗನಿರ್ಣಯವನ್ನು ದೃಢಪಡಿಸಿಕೊಳ್ಳಿ.",
+      ],
+      chemical: { product: "ದೃಢೀಕರಣವಿಲ್ಲದೆ ಶಿಫಾರಸು ಮಾಡುವುದಿಲ್ಲ", dose: "—" },
+      prevention: [
+        "ಹತ್ತಿರದ ಸಸ್ಯಗಳಲ್ಲಿ ಇದೇ ರೀತಿಯ ಲಕ್ಷಣಗಳಿವೆಯೇ ಪರಿಶೀಲಿಸಿ.",
+        "ನೀರು ಹಾಕುವಾಗ ಎಲೆಗಳನ್ನು ಒದ್ದೆ ಮಾಡಬೇಡಿ ಮತ್ತು ಸಸ್ಯಗಳ ನಡುವೆ ಗಾಳಿಯಾಡಲು ಬಿಡಿ.",
+        "ಆಯ್ಕೆ ಮಾಡಿದ ಬೆಳೆಗೆ ಸ್ಥಳೀಯವಾಗಿ ಶಿಫಾರಸು ಮಾಡಿದ ಕ್ರಮಗಳನ್ನು ಅನುಸರಿಸಿ.",
       ],
     },
   },

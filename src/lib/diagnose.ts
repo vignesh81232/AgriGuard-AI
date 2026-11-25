@@ -1,21 +1,46 @@
-import { DISEASES, DISEASE_IDS, type DiseaseId, type Severity } from "../data/diseases";
-import type { Crop } from "../i18n/translations";
+import { type DiseaseId, type Severity } from "../data/diseases";
+import { CROPS, type Crop, type Lang } from "../i18n/translations";
 
-/**
- * Diagnosis engine — SIMULATED for the hackathon MVP.
- * No vision model: a deterministic PRNG seeded from the photo and selected
- * crop picks a compatible bundled disease and confidence. Repeating a
- * diagnosis with the same photo and crop produces the same result.
- */
+const MAX_EDGE = 960;
+const CROP_SET = new Set<string>(CROPS);
+
+export type DiagnosisErrorKind =
+  | "api-unavailable"
+  | "image-not-leaf"
+  | "crop-mismatch"
+  | "gemini-not-configured"
+  | "gemini-rate-limited"
+  | "gemini-unavailable"
+  | "invalid-image"
+  | "model-error";
+
+export class DiagnosisError extends Error {
+  readonly kind: DiagnosisErrorKind;
+
+  constructor(kind: DiagnosisErrorKind) {
+    super(kind);
+    this.name = "DiagnosisError";
+    this.kind = kind;
+  }
+}
 
 export interface DiagnosisInput {
   imageName: string;
   crop?: Crop | null;
+  issue: string;
+  language: Lang;
 }
+
+export type LeafHealthStatus = "healthy" | "diseased" | "uncertain";
 
 export interface Diagnosis {
   diseaseId: DiseaseId;
-  confidence: number; // 0–100
+  modelLabel?: string;
+  modelSummary?: string;
+  symptoms?: string[];
+  careAdvice?: string[];
+  healthStatus?: LeafHealthStatus;
+  confidence: number;
   severity: Severity;
   imageDataUrl: string;
   imageName: string;
@@ -23,59 +48,147 @@ export interface Diagnosis {
   createdAt: number;
 }
 
-/** Deterministic 32-bit string hash (FNV-1a), used as PRNG seed. */
-function hashString(str: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+export type PredictionBand = "good" | "average" | "bad";
+
+export function getPredictionBand(diagnosis: Diagnosis): PredictionBand {
+  if (
+    diagnosis.healthStatus === "healthy" ||
+    (!diagnosis.healthStatus && diagnosis.severity === "healthy")
+  ) {
+    return "good";
   }
-  return h >>> 0;
+  if (diagnosis.healthStatus === "diseased") return "bad";
+  if (diagnosis.healthStatus === "uncertain") return "average";
+  if (diagnosis.diseaseId === "unclassified-disease") return "average";
+  return "bad";
 }
 
-/** Mulberry32 PRNG — fast, tiny, seeded. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+export type DiagnosisStatus = "healthy" | "uncertain" | "diseased";
+
+export function getDiagnosisStatus(diagnosis: Diagnosis): DiagnosisStatus {
+  const band = getPredictionBand(diagnosis);
+  return band === "good" ? "healthy" : band === "bad" ? "diseased" : "uncertain";
 }
 
-/**
- * Simulate a diagnosis. Confidence is drawn within the disease's own range,
- * plus a small jitter, so the demo stays predictable yet varied.
- */
-export function diagnoseLeaf(input: DiagnosisInput, imageDataUrl: string): Diagnosis {
-  const seed = hashString(`${input.crop ?? "any"}|${imageDataUrl}`);
-  const rand = mulberry32(seed);
+interface GeminiDiagnosisResponse {
+  crop: string;
+  healthStatus: LeafHealthStatus;
+  condition: string;
+  confidence: number;
+  severity: Severity;
+  summary: string;
+  symptoms: string[];
+  careAdvice: string[];
+}
 
-  const ids = DISEASE_IDS.filter((id) => {
-    const diseaseCrop = DISEASES[id].crop;
-    if (input.crop) return diseaseCrop === input.crop || diseaseCrop === "generic";
-    return diseaseCrop !== "apple";
-  });
-  const idx = Math.floor(rand() * ids.length);
-  const disease = DISEASES[ids[idx]];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  const [lo, hi] = disease.confidenceRange;
-  const confidence = Math.round(lo + rand() * (hi - lo));
+function isCrop(value: unknown): value is Crop {
+  return typeof value === "string" && CROP_SET.has(value);
+}
+
+function isDiagnosisErrorKind(value: unknown): value is DiagnosisErrorKind {
+  return (
+    value === "api-unavailable" ||
+    value === "image-not-leaf" ||
+    value === "crop-mismatch" ||
+    value === "gemini-not-configured" ||
+    value === "gemini-rate-limited" ||
+    value === "gemini-unavailable" ||
+    value === "invalid-image"
+  );
+}
+
+function isGeminiDiagnosisResponse(value: unknown): value is GeminiDiagnosisResponse {
+  if (!isRecord(value)) return false;
+  return (
+    (value.crop === "unknown" || (typeof value.crop === "string" && CROP_SET.has(value.crop))) &&
+    (value.healthStatus === "healthy" ||
+      value.healthStatus === "diseased" ||
+      value.healthStatus === "uncertain") &&
+    typeof value.condition === "string" &&
+    typeof value.confidence === "number" &&
+    Number.isFinite(value.confidence) &&
+    value.confidence >= 0 &&
+    value.confidence <= 100 &&
+    (value.severity === "healthy" ||
+      value.severity === "mild" ||
+      value.severity === "moderate" ||
+      value.severity === "critical" ||
+      value.severity === "unknown") &&
+    typeof value.summary === "string" &&
+    Array.isArray(value.symptoms) &&
+    value.symptoms.every((item) => typeof item === "string") &&
+    Array.isArray(value.careAdvice) &&
+    value.careAdvice.every((item) => typeof item === "string")
+  );
+}
+
+export async function diagnoseLeaf(
+  input: DiagnosisInput,
+  imageDataUrl: string,
+): Promise<Diagnosis> {
+  if (input.crop && !CROP_SET.has(input.crop)) throw new DiagnosisError("model-error");
+
+  let response: Response;
+  try {
+    response = await fetch("/api/diagnose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageDataUrl,
+        crop: input.crop ?? null,
+        issue: input.issue,
+        language: input.language,
+      }),
+    });
+  } catch {
+    throw new DiagnosisError("api-unavailable");
+  }
+
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new DiagnosisError("api-unavailable");
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new DiagnosisError("model-error");
+  }
+
+  if (!response.ok) {
+    const errorCode = isRecord(payload) ? payload.error : undefined;
+    throw new DiagnosisError(
+      isDiagnosisErrorKind(errorCode)
+        ? errorCode
+        : response.status === 413
+          ? "invalid-image"
+          : "model-error",
+    );
+  }
+  if (!isGeminiDiagnosisResponse(payload)) throw new DiagnosisError("model-error");
+
+  const healthy = payload.healthStatus === "healthy";
+  const crop = isCrop(payload.crop) ? payload.crop : null;
 
   return {
-    diseaseId: disease.id,
-    confidence,
-    severity: disease.defaultSeverity,
+    diseaseId: healthy ? "healthy-leaf" : "unclassified-disease",
+    modelLabel: payload.condition,
+    modelSummary: payload.summary,
+    symptoms: payload.symptoms,
+    careAdvice: payload.careAdvice,
+    healthStatus: payload.healthStatus,
+    confidence: Math.round(payload.confidence),
+    severity: healthy ? "healthy" : payload.severity,
     imageDataUrl,
     imageName: input.imageName,
-    crop: input.crop ?? null,
+    crop,
     createdAt: Date.now(),
   };
 }
-
-const MAX_EDGE = 960; // px — keep saved diagnosis history compact
 
 /**
  * Read a File and return a downscaled JPEG dataURL (max 960px on the long
@@ -99,7 +212,7 @@ export function fileToImageData(file: File): Promise<string> {
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve(url); // canvas unavailable — fall back to the raw dataURL
+          resolve(url);
           return;
         }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);

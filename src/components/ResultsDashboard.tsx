@@ -1,8 +1,14 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Card, SectionHeading } from "../i18n";
 import { useI18n } from "../i18n";
 import { getDisease, getLocalized } from "../data/diseases";
-import type { Diagnosis } from "../lib/diagnose";
+import { getPredictionBand, type Diagnosis, type PredictionBand } from "../lib/diagnose";
+import type { TranslationKey } from "../i18n/translations";
+import {
+  generateHealthyCounterpart,
+  HealthyCounterpartError,
+  type HealthyCounterpartErrorKind,
+} from "../lib/healthyCounterpart";
 import {
   CheckCircleIcon,
   DropletIcon,
@@ -13,23 +19,28 @@ import {
 } from "./icons";
 
 /**
- * Full results dashboard: severity meter, side-by-side leaf comparison with a
- * simulated affected-area overlay, organic + chemical remedies and a
- * prevention checklist. All content is local and offline-safe.
+ * Full results dashboard: model score, leaf comparison, curated remedies and
+ * a prevention checklist.
  */
 
 const SEVERITY_TRACK = [
   { key: "mild", color: "var(--color-severity-mild)", label: "severityMild" },
-  { key: "moderate", color: "var(--color-severity-moderate)", label: "severityModerate" },
-  { key: "critical", color: "var(--color-severity-critical)", label: "severityCritical" },
+  { key: "moderate", color: "var(--color-severity-mild)", label: "severityModerate" },
+  { key: "critical", color: "var(--color-severity-mild)", label: "severityCritical" },
 ] as const;
 
-/** Deterministic pseudo-random "lesion" overlay derived from the disease id. */
+const PREDICTION_BAND_LABELS: Record<PredictionBand, TranslationKey> = {
+  good: "predictionGood",
+  average: "predictionAverage",
+  bad: "predictionBad",
+};
+
+/** Illustrative overlay used only for older saved diagnoses with known severity. */
 function affectedOverlay(seed: string): CSSProperties {
   const layers = Array.from({ length: 5 }, (_, i) => {
     const cx = 20 + ((seed.charCodeAt(i % seed.length) * 37 + i * 61) % 60);
     const cy = 12 + ((seed.charCodeAt(i % seed.length) * 53 + i * 41) % 70);
-    return `radial-gradient(circle at ${cx}% ${cy}%, rgb(190 35 35 / 0.4) 0%, rgb(190 35 35 / 0.14) 45%, transparent 72%)`;
+    return `radial-gradient(circle at ${cx}% ${cy}%, rgb(20 140 70 / 0.4) 0%, rgb(20 140 70 / 0.14) 45%, transparent 72%)`;
   });
   return { background: layers.join(", ") };
 }
@@ -37,50 +48,81 @@ function affectedOverlay(seed: string): CSSProperties {
 function SeverityMeter({ diagnosis }: { diagnosis: Diagnosis }) {
   const { t } = useI18n();
   const segWidth = 100 / 3;
+  const band = getPredictionBand(diagnosis);
+  const severityPosition =
+    diagnosis.severity === "mild"
+      ? "16.667%"
+      : diagnosis.severity === "moderate"
+        ? "50%"
+        : diagnosis.severity === "critical"
+          ? "83.333%"
+          : null;
+  const bandLabel = PREDICTION_BAND_LABELS[band];
+  const scoreColor = band === "bad" ? "bg-severity-critical" : "bg-severity-mild";
+  const scoreTextColor = band === "bad" ? "text-severity-critical" : "text-severity-mild";
 
   return (
     <Card>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-heading text-base text-foreground">{t("severityLabel")}</h3>
+        <h3 className="font-heading text-base text-foreground">{t("modelScoreLabel")}</h3>
         <span className="font-heading text-2xl font-bold text-foreground">
           {diagnosis.confidence}%
         </span>
       </div>
 
       <div
-        className="relative mt-4 h-3 overflow-hidden rounded-full"
-        role="img"
-        aria-label={`${t("severityLabel")}: ${t("confidenceMatch", { confidence: diagnosis.confidence })}`}
+        className="mt-4 h-3 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-valuenow={diagnosis.confidence}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={t("modelScoreLabel")}
       >
-        <div className="flex h-full w-full">
+        <div
+          className={`h-full rounded-full ${scoreColor}`}
+          style={{ width: `${Math.max(0, Math.min(100, diagnosis.confidence))}%` }}
+        />
+      </div>
+      <p className={`mt-2 text-sm font-semibold ${scoreTextColor}`}>
+        {t(bandLabel)}
+      </p>
+
+      {diagnosis.severity === "unknown" ? (
+        <p className="mt-3 text-sm text-foreground/65">{t("severityUnknown")}</p>
+      ) : null}
+
+      {severityPosition ? (
+        <>
+          <div
+            className="relative mt-4 flex h-3 overflow-hidden rounded-full"
+            role="img"
+            aria-label={t("severityLabel")}
+          >
+            {SEVERITY_TRACK.map((s) => (
+              <div
+                key={s.key}
+                className="h-full"
+                style={{ width: `${segWidth}%`, backgroundColor: s.color, opacity: 0.3 }}
+              />
+            ))}
+            <span
+              className="absolute top-0 h-full w-1 -translate-x-1/2 rounded bg-foreground"
+              style={{ left: severityPosition }}
+            />
+          </div>
+          <div className="mt-2 flex">
           {SEVERITY_TRACK.map((s) => (
             <div
               key={s.key}
-              className="h-full"
-              style={{
-                width: `${segWidth}%`,
-                backgroundColor: `color-mix(in oklab, ${s.color} 28%, transparent)`,
-              }}
-            />
+              className="text-center text-[11px] font-semibold text-foreground/60"
+              style={{ width: `${segWidth}%` }}
+            >
+              {t(s.label)}
+            </div>
           ))}
-        </div>
-        <div
-          className="absolute top-0 h-full w-1 -translate-x-1/2 rounded-full bg-foreground/85"
-          style={{ left: `${Math.max(3, Math.min(97, diagnosis.confidence))}%` }}
-        />
-      </div>
-
-      <div className="mt-2 flex">
-        {SEVERITY_TRACK.map((s) => (
-          <div
-            key={s.key}
-            className="text-center text-[11px] font-semibold text-foreground/60"
-            style={{ width: `${segWidth}%` }}
-          >
-            {t(s.label)}
           </div>
-        ))}
-      </div>
+        </>
+      ) : null}
 
       {diagnosis.severity === "healthy" ? (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-severity-mild/10 px-3 py-2.5 text-sm font-medium text-severity-mild">
@@ -94,8 +136,51 @@ function SeverityMeter({ diagnosis }: { diagnosis: Diagnosis }) {
 
 function LeafComparison({ diagnosis }: { diagnosis: Diagnosis }) {
   const { t } = useI18n();
-  const healthy = diagnosis.severity === "healthy";
+  const showAffectedOverlay = diagnosis.severity !== "healthy" && diagnosis.severity !== "unknown";
   const overlay = affectedOverlay(diagnosis.diseaseId + String(diagnosis.confidence));
+  const [counterpartImage, setCounterpartImage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] =
+    useState<HealthyCounterpartErrorKind | null>(null);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    requestId.current += 1;
+    setCounterpartImage(null);
+    setGenerationError(null);
+    setIsGenerating(false);
+  }, [diagnosis.crop, diagnosis.imageDataUrl]);
+
+  const generateCounterpart = async () => {
+    const activeRequest = ++requestId.current;
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const image = await generateHealthyCounterpart(diagnosis.imageDataUrl, diagnosis.crop);
+      if (requestId.current === activeRequest) setCounterpartImage(image);
+    } catch (error) {
+      if (requestId.current === activeRequest) {
+        setGenerationError(
+          error instanceof HealthyCounterpartError
+            ? error.kind
+            : "image-generation-unavailable",
+        );
+      }
+    } finally {
+      if (requestId.current === activeRequest) setIsGenerating(false);
+    }
+  };
+
+  const generationErrorMessage =
+    generationError === "api-unavailable"
+      ? t("apiUnavailableError")
+      : generationError === "gemini-not-configured"
+        ? t("geminiNotConfiguredError")
+        : generationError === "image-generation-rate-limited"
+          ? t("healthyCounterpartRateLimited")
+          : generationError
+            ? t("healthyCounterpartError")
+            : null;
 
   return (
     <section aria-label={t("leafCompareAria")}>
@@ -108,7 +193,7 @@ function LeafComparison({ diagnosis }: { diagnosis: Diagnosis }) {
               alt={t("yourLeafLabel")}
               className="h-full w-full object-cover"
             />
-            {!healthy ? (
+            {showAffectedOverlay ? (
               <div
                 className="absolute inset-0 mix-blend-multiply"
                 style={overlay}
@@ -119,8 +204,8 @@ function LeafComparison({ diagnosis }: { diagnosis: Diagnosis }) {
               {t("yourLeafLabel")}
             </span>
           </div>
-          {!healthy ? (
-            <figcaption className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-severity-critical">
+          {showAffectedOverlay ? (
+            <figcaption className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-severity-mild">
               <DropletIcon size={13} />
               {t("affectedHint")}
             </figcaption>
@@ -129,26 +214,62 @@ function LeafComparison({ diagnosis }: { diagnosis: Diagnosis }) {
 
         <figure className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            <img
-              src={diagnosis.imageDataUrl}
-              alt={t("referenceLeafLabel")}
-              className="h-full w-full object-cover"
-            />
-            <div
-              className="absolute inset-0 opacity-60"
-              style={{
-                background:
-                  "radial-gradient(circle at 50% 45%, transparent 30%, rgb(20 90 45 / 0.14) 75%)",
-              }}
-              aria-hidden="true"
-            />
-            <span className="absolute left-2.5 top-2.5 rounded-full bg-severity-mild/90 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur">
-              {t("referenceLeafLabel")}
-            </span>
+            {counterpartImage ? (
+              <>
+                <img
+                  src={counterpartImage}
+                  alt={t("generatedCounterpartLabel")}
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute left-2.5 top-2.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur">
+                  {t("generatedCounterpartLabel")}
+                </span>
+              </>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-foreground/60">
+                <LeafIcon size={40} className="text-primary-700" />
+                <p className="text-sm">{t("healthyReferenceUnavailable")}</p>
+                <button
+                  type="button"
+                  aria-busy={isGenerating}
+                  onClick={generateCounterpart}
+                  disabled={isGenerating}
+                  className="rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:cursor-wait disabled:opacity-70"
+                >
+                  {isGenerating
+                    ? t("generatingHealthyCounterpart")
+                    : t("generateHealthyCounterpart")}
+                </button>
+                {generationErrorMessage ? (
+                  <p role="alert" className="max-w-xs text-sm text-severity-critical">
+                    {generationErrorMessage}
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
-          <figcaption className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-severity-mild">
-            <CheckCircleIcon size={13} />
-            {t("leafCompareRight")}
+          <figcaption className="space-y-2 px-3.5 py-2.5 text-xs leading-relaxed text-foreground/60">
+            <p>{t("healthyCounterpartDisclaimer")}</p>
+            {counterpartImage ? (
+              <>
+                <button
+                  type="button"
+                  aria-busy={isGenerating}
+                  onClick={generateCounterpart}
+                  disabled={isGenerating}
+                  className="font-semibold text-primary-800 underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isGenerating
+                    ? t("generatingHealthyCounterpart")
+                    : t("regenerateHealthyCounterpart")}
+                </button>
+                {generationErrorMessage ? (
+                  <p role="alert" className="text-severity-critical">
+                    {generationErrorMessage}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </figcaption>
         </figure>
       </div>
@@ -158,8 +279,45 @@ function LeafComparison({ diagnosis }: { diagnosis: Diagnosis }) {
 
 function Remedies({ diagnosis }: { diagnosis: Diagnosis }) {
   const { t, lang } = useI18n();
-  const block = getLocalized(getDisease(diagnosis.diseaseId), lang);
+  const disease = getDisease(diagnosis.diseaseId);
+  const block = getLocalized(disease, lang);
   const healthy = diagnosis.severity === "healthy";
+
+  if (diagnosis.careAdvice?.length) {
+    return (
+      <section>
+        <SectionHeading icon={<SproutIcon size={20} />} title={t("aiCareTitle")} />
+        <Card>
+          <ul className="space-y-3">
+            {diagnosis.careAdvice.map((step, index) => (
+              <li key={`${step}-${index}`} className="flex items-start gap-3">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-200/60 text-xs font-bold text-primary-800">
+                  {index + 1}
+                </span>
+                <p className="text-[15px] leading-relaxed text-foreground/85">{step}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-border pt-3 text-xs leading-relaxed text-foreground/50">
+            {t("aiCareDisclaimer")}
+          </p>
+        </Card>
+      </section>
+    );
+  }
+
+  if (diagnosis.crop === "tomato" || disease.id === "unclassified-disease") {
+    return (
+      <section>
+        <SectionHeading icon={<SproutIcon size={20} />} title={t("organicTitle")} />
+        <Card>
+          <p className="text-[15px] leading-relaxed text-foreground/80">
+            {t("modelAdviceUnavailable")}
+          </p>
+        </Card>
+      </section>
+    );
+  }
 
   return (
     <section>

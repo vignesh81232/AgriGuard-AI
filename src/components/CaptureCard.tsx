@@ -1,20 +1,39 @@
 import { useCallback, useRef, useState, type DragEvent } from "react";
 import { Card } from "../i18n";
 import { useI18n } from "../i18n";
-import { CROPS, type Crop, type TranslationKey } from "../i18n/translations";
+import { DIAGNOSIS_CROPS, type Crop, type TranslationKey } from "../i18n/translations";
 import { CameraIcon, ImagePlusIcon, MicIcon, SpinnerIcon, XIcon } from "./icons";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
-import { diagnoseLeaf, fileToImageData, type Diagnosis } from "../lib/diagnose";
+import {
+  diagnoseLeaf,
+  DiagnosisError,
+  fileToImageData,
+  type Diagnosis,
+  type DiagnosisErrorKind,
+} from "../lib/diagnose";
 
 const CROP_KEYS: Record<Crop, TranslationKey> = {
   tomato: "cropTomato",
   corn: "cropCorn",
   potato: "cropPotato",
   rice: "cropRice",
+  wheat: "cropWheat",
+  apple: "cropApple",
+  grape: "cropGrape",
+};
+
+const DIAGNOSIS_ERROR_KEYS: Record<DiagnosisErrorKind, TranslationKey> = {
+  "api-unavailable": "apiUnavailableError",
+  "image-not-leaf": "imageNotLeafError",
+  "crop-mismatch": "cropMismatchError",
+  "gemini-not-configured": "geminiNotConfiguredError",
+  "gemini-rate-limited": "geminiRateLimitedError",
+  "gemini-unavailable": "geminiUnavailableError",
+  "invalid-image": "invalidImageError",
+  "model-error": "modelError",
 };
 
 interface CaptureCardProps {
-  busy?: boolean;
   onDiagnose: (result: Diagnosis) => void;
 }
 
@@ -23,22 +42,24 @@ interface CaptureCardProps {
  * downscaled and held in memory, the engine runs locally, and the result is
  * cached to localStorage so the field visit survives a reload.
  */
-export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardProps) {
-  const { t, speechLang } = useI18n();
+export default function CaptureCard({ onDiagnose }: CaptureCardProps) {
+  const { t, speechLang, lang } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageName, setImageName] = useState<string>("");
-  const [crop, setCrop] = useState<Crop | "">("");
+  const [crop, setCrop] = useState<Crop | "auto">("auto");
   const [issue, setIssue] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
 
   const mic = useSpeechRecognition(speechLang, (finalText) => setIssue(finalText));
 
   const handleFile = useCallback(async (file: File) => {
     setFileError(null);
+    setDiagnosisError(null);
     if (!file.type.startsWith("image/")) {
       setFileError(t("fileError"));
       return;
@@ -64,13 +85,25 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
 
   const handleDiagnose = useCallback(async () => {
     if (!imageDataUrl || analyzing) return;
+    setDiagnosisError(null);
+
     setAnalyzing(true);
-    // Small artificial pause so the "scanning" moment feels real.
-    await new Promise((r) => setTimeout(r, 1100));
-    const result = diagnoseLeaf({ imageName, crop: crop || null }, imageDataUrl);
-    setAnalyzing(false);
-    onDiagnose(result);
-  }, [imageDataUrl, imageName, crop, analyzing, onDiagnose]);
+    try {
+      const result = await diagnoseLeaf({
+        imageName,
+        crop: crop === "auto" ? null : crop,
+        issue,
+        language: lang,
+      }, imageDataUrl);
+      onDiagnose(result);
+    } catch (error) {
+      const key =
+        error instanceof DiagnosisError ? DIAGNOSIS_ERROR_KEYS[error.kind] : "modelError";
+      setDiagnosisError(t(key));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [imageDataUrl, imageName, crop, issue, lang, analyzing, onDiagnose, t]);
 
   return (
     <Card className="!p-0 overflow-hidden">
@@ -78,7 +111,7 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png"
         capture="environment"
         className="sr-only"
         aria-label={t("uploadTitle")}
@@ -149,6 +182,11 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
           {fileError}
         </p>
       ) : null}
+      {diagnosisError ? (
+        <p role="alert" className="border-t border-border bg-severity-moderate/10 px-5 py-3 text-sm font-medium text-foreground">
+          {diagnosisError}
+        </p>
+      ) : null}
 
       {/* ---- Options + CTA ---- */}
       <div className="space-y-3 p-5">
@@ -158,18 +196,27 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
           </span>
           <select
             aria-label={t("cropLabel")}
+            aria-required="false"
             value={crop}
-            onChange={(e) => setCrop(e.target.value as Crop | "")}
+            onChange={(e) => {
+              const value = e.target.value;
+              const selectedCrop = DIAGNOSIS_CROPS.find((candidate) => candidate === value);
+              setCrop(value === "auto" ? "auto" : selectedCrop ?? "auto");
+              setDiagnosisError(null);
+            }}
             className="w-full cursor-pointer rounded-xl border border-border bg-white px-4 py-3 text-base text-foreground"
           >
-            <option value="">{t("cropPlaceholder")}</option>
-            {CROPS.map((c) => (
+            <option value="auto">{t("cropAutoDetect")}</option>
+            {DIAGNOSIS_CROPS.map((c) => (
               <option key={c} value={c}>
                 {t(CROP_KEYS[c])}
               </option>
             ))}
           </select>
         </label>
+        <p role="status" className="text-sm text-foreground/60">
+          {t("cropDiagnosisUnavailable")}
+        </p>
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-foreground">
@@ -180,6 +227,7 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
               value={issue}
               onChange={(e) => setIssue(e.target.value)}
               rows={2}
+              maxLength={300}
               placeholder={t("issuePlaceholder")}
               className="w-full resize-none rounded-xl border border-border bg-white px-4 py-3 pr-12 text-base text-foreground placeholder:text-foreground/40"
             />
@@ -208,7 +256,7 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
         <button
           type="button"
           onClick={handleDiagnose}
-          disabled={!imageDataUrl || analyzing || busy}
+          disabled={!imageDataUrl || analyzing}
           className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-on-primary transition-all duration-150 ease-out hover:bg-primary-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {analyzing ? (
@@ -227,9 +275,10 @@ export default function CaptureCard({ busy = false, onDiagnose }: CaptureCardPro
           {analyzing
             ? t("analyzingSub")
             : imageDataUrl
-              ? `${imageName} · ${t("worksOffline")}`
+              ? `${imageName} · ${t("analysisModel")}`
               : t("diagnoseBtnDisabledHint")}
         </p>
+        <p className="text-center text-xs text-foreground/50">{t("modelPrivacyNotice")}</p>
       </div>
     </Card>
   );

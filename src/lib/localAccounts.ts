@@ -234,3 +234,19 @@ export async function loadDiagnosisHistory(username: string): Promise<DiagnosisH
   );
   return (entries as DiagnosisHistoryEntry[]).sort((a, b) => b.createdAt - a.createdAt);
 }
+
+export async function deleteDiagnosisForAccount(username: string, entryId: string): Promise<void> {
+  const database = await openDatabase();
+  try {
+    const entry = (await requestResult(
+      database.transaction("history", "readonly").objectStore("history").get(entryId),
+    )) as DiagnosisHistoryEntry | undefined;
+    if (!entry || entry.username !== username) return;
+
+    await requestResult(
+      database.transaction("history", "readwrite").objectStore("history").delete(entryId),
+    );
+  } catch {
+    throw new AccountError("storage-unavailable");
+  }
+}
